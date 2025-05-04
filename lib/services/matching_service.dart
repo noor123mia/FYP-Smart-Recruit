@@ -1,3 +1,4 @@
+// MatchingService.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
@@ -5,7 +6,12 @@ import 'package:flutter/foundation.dart';
 class MatchingService {
   final String apiUrl;
 
-  MatchingService({this.apiUrl = "http://192.168.10.7:7860"});
+  //MatchingService({this.apiUrl = "http://172.0.5.121:7860"});
+
+  MatchingService({this.apiUrl = "http://192.168.10.13:7860"});
+
+  // Constructor with default URL or custom URL
+  //MatchingService({this.apiUrl = "https://MIA1924-job-matching-api.hf.space"});
 
   Future<Map<String, dynamic>> matchCandidate(
       Map<String, dynamic> job, Map<String, dynamic> candidate) async {
@@ -30,6 +36,7 @@ class MatchingService {
 
       if (kDebugMode) {
         print('API Response Status: ${response.statusCode}');
+        print('Raw Response Body: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -59,13 +66,20 @@ class MatchingService {
       final sanitizedCandidates =
           candidates.map((c) => _sanitizeDataForApi(c)).toList();
 
+      final payload = {
+        "job": sanitizedJob,
+        "candidates": sanitizedCandidates,
+      };
+
+      if (kDebugMode) {
+        print('Final Payload sent to API:');
+        print(jsonEncode(payload));
+      }
+
       final response = await http.post(
         Uri.parse('$apiUrl/batch-match/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'job': sanitizedJob,
-          'candidates': sanitizedCandidates,
-        }),
+        body: jsonEncode(payload),
       );
 
       if (kDebugMode) {
@@ -78,13 +92,14 @@ class MatchingService {
         if (data.containsKey('matches') && data['matches'] is List) {
           return {
             'matches': List<Map<String, dynamic>>.from(data['matches']),
-            'rawResponse': response.body, // Include raw response body
+            'rawResponse': response.body,
           };
         } else {
           throw Exception('Invalid response format from batch API');
         }
       } else {
-        throw Exception('Batch API Error: ${response.statusCode}');
+        throw Exception(
+            'Batch API Error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -102,7 +117,7 @@ class MatchingService {
       }
       return {
         'matches': results,
-        'rawResponse': '', // Empty raw response for fallback
+        'rawResponse': '',
       };
     }
   }
@@ -134,7 +149,7 @@ class MatchingService {
       Map<String, dynamic> result, Map<String, dynamic> candidate) {
     return {
       'candidate': candidate,
-      'match_score': (result['match_score'] as num?)?.toDouble() ?? 0.0,
+      'match_score': (result['overall_match_score'] as num?)?.toDouble() ?? 0.0,
       'category_scores': result['category_scores'] as Map<String, dynamic>? ??
           {
             'required_skills': 0.0,
